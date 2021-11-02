@@ -1,5 +1,8 @@
 name: Build Go Binaries
-on: release
+on:
+  release:
+    types:
+      - created
 
 jobs:
   release-linux-386:
