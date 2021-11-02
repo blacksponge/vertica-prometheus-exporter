@@ -1,4 +1,4 @@
-module github.com/zwennesm/vertica-prometheus-exporter
+module github.com/blacksponge/vertica-prometheus-exporter
 
 go 1.14
 
@@ -8,4 +8,5 @@ require (
 	github.com/namsral/flag v1.7.4-pre
 	github.com/sirupsen/logrus v1.4.2
 	github.com/vertica/vertica-sql-go v1.1.0
+	google.golang.org/appengine v1.6.7 // indirect
 )
