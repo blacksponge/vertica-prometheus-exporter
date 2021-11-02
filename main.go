@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"os"
 
 	"github.com/namsral/flag"
 	log "github.com/sirupsen/logrus"
@@ -12,6 +11,29 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/zwennesm/vertica-prometheus-exporter/monitoring"
 )
+
+
+type Server struct {
+	dataSourceName string
+	db *sqlx.DB
+}
+
+func NewServer(dsn string) *Server {
+	return &Server {
+		dataSourceName: dsn,
+	}
+}
+
+func (s *Server) GetDB() (*sqlx.DB, error) {
+	if s.db == nil || s.db.Ping() != nil {
+		db, err := sqlx.Connect("vertica", s.dataSourceName)
+		if err != nil {
+			return nil, err
+		}
+		s.db = db
+	}
+	return s.db, nil
+}
 
 func main() {
 	location := flag.String("location", "/metrics", "Metrics path")
@@ -24,20 +46,23 @@ func main() {
 	flag.Parse()
 
 	connString := fmt.Sprintf("vertica://%v:%v@%v:%v/%v", *dbUsername, *dbPassword, *dbHost, *dbPort, *dbName)
-	db, err := sqlx.Connect("vertica", connString)
-	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
-	}
+	server := NewServer(connString)
 
-	serveMetrics(*location, *listen, *db)
+	serveMetrics(*location, *listen, *server)
 }
 
 // Serve Vertica metrics at chosen address and url.
-func serveMetrics(location, listen string, db sqlx.DB) {
+func serveMetrics(location, listen string, server Server) {
 
 	h := func(w http.ResponseWriter, r *http.Request) {
-		metrics := monitoring.NewPrometheusMetrics(db)
+		db, err := server.GetDB()
+		if err != nil {
+			log.Errorf("Could not connect to vertica: %v", err)
+			fmt.Fprintf(w, "vertica_up 0\n")
+			return
+		}
+		fmt.Fprintf(w, "vertica_up 1\n")
+		metrics := monitoring.NewPrometheusMetrics(*db)
 		for _, obj := range metrics {
 			metric := obj.ToMetric()
 			for key, value := range metric {
