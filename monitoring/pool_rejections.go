@@ -17,8 +17,8 @@ type PoolRejection struct {
 // NewPoolRejections returns a list of resource pool rejections from Vertica.
 func NewPoolRejections(db *sqlx.DB) []PoolRejection {
 	sql := `
-	SELECT 
-		node_name, 
+	SELECT
+		node_name,
 		pool_name,
 		rejection_count
 	FROM v_monitor.resource_rejections`
@@ -33,12 +33,12 @@ func NewPoolRejections(db *sqlx.DB) []PoolRejection {
 }
 
 // ToMetric converts PoolRejection to a Map.
-func (pr PoolRejection) ToMetric() map[string]int {
-	metrics := map[string]int{}
+func (pr PoolRejection) ToMetric() map[string]float64 {
+	metrics := map[string]float64{}
 
 	node := fmt.Sprintf("node_name=%q", pr.NodeName)
 	pool := fmt.Sprintf("pool_name=%q", pr.PoolName)
-	metrics[fmt.Sprintf("vertica_pool_rejection_count{%s, %s}", node, pool)] = pr.RejectionCount
+	metrics[fmt.Sprintf("vertica_pool_rejection_count{%s, %s}", node, pool)] = float64(pr.RejectionCount)
 
 	return metrics
 }

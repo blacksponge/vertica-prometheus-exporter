@@ -8,7 +8,7 @@ import (
 
 // PrometheusMetric maps a struct to a Prometheus valid map.
 type PrometheusMetric interface {
-	ToMetric() map[string]int
+	ToMetric() map[string]float64
 }
 
 func NewPrometheusMetrics(db sqlx.DB) []PrometheusMetric {
@@ -27,6 +27,7 @@ func NewPrometheusMetrics(db sqlx.DB) []PrometheusMetric {
 		metrics = append(metrics, usage)
 	}
 	metrics = append(metrics, NewVerticaSystem(&db))
+	metrics = append(metrics, NewLicenseCompliance(&db))
 
 	return metrics
 }

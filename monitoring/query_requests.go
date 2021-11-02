@@ -18,10 +18,10 @@ type QueryRequest struct {
 func NewQueryRequests(db *sqlx.DB) []QueryRequest {
 	sql := `
 	SELECT
-		user_name, 
-		SUM(COALESCE(request_duration_ms,0))::INT request_duration_ms, 
-		SUM(COALESCE(memory_acquired_mb,0))::INT memory_acquired_mb 
-	FROM v_monitor.query_requests 
+		user_name,
+		SUM(COALESCE(request_duration_ms,0))::INT request_duration_ms,
+		SUM(COALESCE(memory_acquired_mb,0))::INT memory_acquired_mb
+	FROM v_monitor.query_requests
 	GROUP BY user_name;
 	`
 
@@ -35,12 +35,12 @@ func NewQueryRequests(db *sqlx.DB) []QueryRequest {
 }
 
 // ToMetric converts QueryRequest to a Map.
-func (qr QueryRequest) ToMetric() map[string]int {
-	metrics := map[string]int{}
+func (qr QueryRequest) ToMetric() map[string]float64 {
+	metrics := map[string]float64{}
 
 	username := fmt.Sprintf("user_name=%q", qr.UserName)
-	metrics[fmt.Sprintf("vertica_request_duration_ms{%s}", username)] = qr.RequestDurationMS
-	metrics[fmt.Sprintf("vertica_memory_acquired_mb{%s}", username)] = qr.MemoryAcquiredMB
+	metrics[fmt.Sprintf("vertica_request_duration_ms{%s}", username)] = float64(qr.RequestDurationMS)
+	metrics[fmt.Sprintf("vertica_memory_acquired_mb{%s}", username)] = float64(qr.MemoryAcquiredMB)
 
 	return metrics
 }
