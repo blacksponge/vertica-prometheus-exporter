@@ -1,17 +1,18 @@
 package monitoring
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // NodeState contains information about each node in a Vertica cluster.
 type NodeState struct {
 	NodeID    string `db:"node_id"`
 	NodeName  string `db:"node_name"`
-	NodeState int    `db:"node_state"`
+	NodeState float64    `db:"node_state"`
 }
 
 // NewNodeState returns the status for each node in the Vertica cluster.
@@ -32,13 +33,12 @@ func NewNodeState(db *sqlx.DB) []NodeState {
 	return nodeState
 }
 
-// ToMetric converts NodeState to a Map.
-func (ns NodeState) ToMetric() map[string]float64 {
-	metrics := map[string]float64{}
-
-	id := fmt.Sprintf("node_id=%q", ns.NodeID)
-	name := fmt.Sprintf("node_name=%q", ns.NodeName)
-	metrics[fmt.Sprintf("vertica_node_state{%s, %s}", id, name)] = float64(ns.NodeState)
-
-	return metrics
+func (ns NodeState) Collect(ch chan<- prometheus.Metric) {
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("node_state", []string { "node_id", "node_name" }),
+		prometheus.GaugeValue,
+		ns.NodeState,
+		ns.NodeID,
+		ns.NodeName,
+	)
 }

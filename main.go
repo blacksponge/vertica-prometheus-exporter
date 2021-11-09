@@ -6,34 +6,14 @@ import (
 
 	"github.com/namsral/flag"
 	log "github.com/sirupsen/logrus"
-	_ "github.com/vertica/vertica-sql-go"
 
-	"github.com/jmoiron/sqlx"
+    "github.com/prometheus/client_golang/prometheus"
+    "github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/blacksponge/vertica-prometheus-exporter/monitoring"
+	"github.com/blacksponge/vertica-prometheus-exporter/db"
 )
 
-
-type Server struct {
-	dataSourceName string
-	db *sqlx.DB
-}
-
-func NewServer(dsn string) *Server {
-	return &Server {
-		dataSourceName: dsn,
-	}
-}
-
-func (s *Server) GetDB() (*sqlx.DB, error) {
-	if s.db == nil || s.db.Ping() != nil {
-		db, err := sqlx.Connect("vertica", s.dataSourceName)
-		if err != nil {
-			return nil, err
-		}
-		s.db = db
-	}
-	return s.db, nil
-}
 
 func main() {
 	location := flag.String("location", "/metrics", "Metrics path")
@@ -46,33 +26,12 @@ func main() {
 	flag.Parse()
 
 	connString := fmt.Sprintf("vertica://%v:%v@%v:%v/%v", *dbUsername, *dbPassword, *dbHost, *dbPort, *dbName)
-	server := NewServer(connString)
+	server := db.NewServer(connString)
+	collector := monitoring.NewVerticaCollect(server)
+	prometheus.MustRegister(collector)
 
-	serveMetrics(*location, *listen, *server)
-}
-
-// Serve Vertica metrics at chosen address and url.
-func serveMetrics(location, listen string, server Server) {
-
-	h := func(w http.ResponseWriter, r *http.Request) {
-		db, err := server.GetDB()
-		if err != nil {
-			log.Errorf("Could not connect to vertica: %v", err)
-			fmt.Fprintf(w, "vertica_up 0\n")
-			return
-		}
-		fmt.Fprintf(w, "vertica_up 1\n")
-		metrics := monitoring.NewPrometheusMetrics(*db)
-		for _, obj := range metrics {
-			metric := obj.ToMetric()
-			for key, value := range metric {
-				fmt.Fprintf(w, "%s %f\n", key, value)
-			}
-		}
-	}
-
-	http.HandleFunc(location, h)
-	log.Printf("starting serving metrics at %s%s", listen, location)
-	err := http.ListenAndServe(listen, nil)
+	log.Infof("starting serving metrics at %s%s", *listen, *location)
+	http.Handle(*location, promhttp.Handler())
+	err := http.ListenAndServe(*listen, nil)
 	log.Fatal(err)
 }

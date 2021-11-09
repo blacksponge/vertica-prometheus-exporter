@@ -1,17 +1,20 @@
 package monitoring
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // PoolRejection shows the amount of resource pool rejections per node.
 type PoolRejection struct {
+	Reason         string `db:"reason"`
+	ResourceType   string `db:"resource_type"`
 	NodeName       string `db:"node_name"`
 	PoolName       string `db:"pool_name"`
-	RejectionCount int    `db:"rejection_count"`
+	RejectionCount float64 `db:"rejection_count"`
 }
 
 // NewPoolRejections returns a list of resource pool rejections from Vertica.
@@ -20,7 +23,9 @@ func NewPoolRejections(db *sqlx.DB) []PoolRejection {
 	SELECT
 		node_name,
 		pool_name,
-		rejection_count
+		rejection_count,
+		resource_type,
+		reason
 	FROM v_monitor.resource_rejections`
 
 	rejections := []PoolRejection{}
@@ -32,13 +37,14 @@ func NewPoolRejections(db *sqlx.DB) []PoolRejection {
 	return rejections
 }
 
-// ToMetric converts PoolRejection to a Map.
-func (pr PoolRejection) ToMetric() map[string]float64 {
-	metrics := map[string]float64{}
-
-	node := fmt.Sprintf("node_name=%q", pr.NodeName)
-	pool := fmt.Sprintf("pool_name=%q", pr.PoolName)
-	metrics[fmt.Sprintf("vertica_pool_rejection_count{%s, %s}", node, pool)] = float64(pr.RejectionCount)
-
-	return metrics
+func (pr PoolRejection) Collect(ch chan<- prometheus.Metric) {
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("pool_rejection_count", []string { "node_name", "pool_name", "resource_type", "reason" }),
+		prometheus.GaugeValue,
+		pr.RejectionCount,
+		pr.NodeName,
+		pr.PoolName,
+		pr.ResourceType,
+		pr.Reason,
+	)
 }

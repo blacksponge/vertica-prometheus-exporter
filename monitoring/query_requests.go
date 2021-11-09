@@ -1,10 +1,11 @@
 package monitoring
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // QueryRequest lists query performance metrics on the username level.
@@ -34,13 +35,18 @@ func NewQueryRequests(db *sqlx.DB) []QueryRequest {
 	return queryRequests
 }
 
-// ToMetric converts QueryRequest to a Map.
-func (qr QueryRequest) ToMetric() map[string]float64 {
-	metrics := map[string]float64{}
+func (qr QueryRequest) Collect(ch chan<- prometheus.Metric) {
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("request_duration_ms", []string { "user_name" }),
+		prometheus.GaugeValue,
+		float64(qr.RequestDurationMS),
+		qr.UserName,
+	)
 
-	username := fmt.Sprintf("user_name=%q", qr.UserName)
-	metrics[fmt.Sprintf("vertica_request_duration_ms{%s}", username)] = float64(qr.RequestDurationMS)
-	metrics[fmt.Sprintf("vertica_memory_acquired_mb{%s}", username)] = float64(qr.MemoryAcquiredMB)
-
-	return metrics
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("memory_acquired_mb", []string { "user_name" }),
+		prometheus.GaugeValue,
+		float64(qr.MemoryAcquiredMB),
+		qr.UserName,
+	)
 }

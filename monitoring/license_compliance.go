@@ -7,6 +7,8 @@ import (
 	"strconv"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type LicenseCompliance struct {
@@ -94,4 +96,48 @@ func (lc LicenseCompliance) ToMetric() map[string]float64 {
 	metrics["vertica_license_compliance_raw_audit_tiime"] = float64(lc.AuditTime.Unix())
 
 	return metrics
+}
+
+func (lc LicenseCompliance) Collect(ch chan<- prometheus.Metric) {
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("license_compliance_license_size", nil),
+		prometheus.GaugeValue,
+		lc.LicenseSize,
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("license_compliance_utilization", nil),
+		prometheus.GaugeValue,
+		lc.Utilization,
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("license_compliance_node_count", nil),
+		prometheus.GaugeValue,
+		float64(lc.NodeCount),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("license_compliance_node_limmit", nil),
+		prometheus.GaugeValue,
+		float64(lc.NodeLimit),
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("license_compliance_raw_data_size", nil),
+		prometheus.GaugeValue,
+		lc.RawDataSize,
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("license_compliance_raw_data_confidence", nil),
+		prometheus.GaugeValue,
+		lc.RawDataConfidence,
+	)
+
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("license_compliance_raw_audit_tiime", nil),
+		prometheus.GaugeValue,
+		float64(lc.AuditTime.Unix()),
+	)
 }

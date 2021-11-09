@@ -1,19 +1,20 @@
 package monitoring
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // PoolUsage shows gneral resource pool usage stats.
 type PoolUsage struct {
 	NodeName                string `db:"node_name"`
 	PoolName                string `db:"pool_name"`
-	MemoryInUseKB           int    `db:"memory_inuse_kb"`
-	GeneralMemoryBorrowedKB int    `db:"general_memory_borrowed_kb"`
-	RunningQueryCount       int    `db:"running_query_count"`
+	MemoryInUseKB           float64    `db:"memory_inuse_kb"`
+	GeneralMemoryBorrowedKB float64    `db:"general_memory_borrowed_kb"`
+	RunningQueryCount       float64    `db:"running_query_count"`
 }
 
 // NewPoolUsage returns a list of pool usage stats.
@@ -37,15 +38,28 @@ func NewPoolUsage(db *sqlx.DB) []PoolUsage {
 	return usage
 }
 
-// ToMetric converts PoolUsage to a Map.
-func (usage PoolUsage) ToMetric() map[string]float64 {
-	metrics := map[string]float64{}
+func (usage PoolUsage) Collect(ch chan<- prometheus.Metric) {
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("pool_memory_inuse_kb", []string { "node_name", "pool_name" }),
+		prometheus.GaugeValue,
+		usage.MemoryInUseKB,
+		usage.NodeName,
+		usage.PoolName,
+	)
 
-	node := fmt.Sprintf("node_name=%q", usage.NodeName)
-	pool := fmt.Sprintf("pool_name=%q", usage.PoolName)
-	metrics[fmt.Sprintf("vertica_pool_memory_inuse_kb{%s, %s}", node, pool)] = float64(usage.MemoryInUseKB)
-	metrics[fmt.Sprintf("vertica_pool_memory_borrowed_kb{%s, %s}", node, pool)] = float64(usage.GeneralMemoryBorrowedKB)
-	metrics[fmt.Sprintf("vertica_pool_running_query_count{%s, %s}", node, pool)] = float64(usage.RunningQueryCount)
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("pool_memory_borrowed_kb", []string { "node_name", "pool_name" }),
+		prometheus.GaugeValue,
+		usage.GeneralMemoryBorrowedKB,
+		usage.NodeName,
+		usage.PoolName,
+	)
 
-	return metrics
+	ch <- prometheus.MustNewConstMetric(
+		NewDesc("pool_running_query_count", []string { "node_name", "pool_name" }),
+		prometheus.GaugeValue,
+		usage.RunningQueryCount,
+		usage.NodeName,
+		usage.PoolName,
+	)
 }
